@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 
 const DIFF = {
@@ -57,14 +57,28 @@ function Setup({ settings, setSettings, onStart }) {
   );
 }
 
-function Lobby({ run, onDone }) {
+function Lobby({ run, onDone, onQuit }) {
+  const [left, setLeft] = useState(run.d.lobby);    // 8 seconds
+
+  // 1. start a 1-second timer when the lobby appears
+  useEffect(() => {
+    const t = setInterval(() => setLeft(l => l - 1), 1000);
+    return () => clearInterval(t);                 // cleanup: stop the timer when the lobby goes away
+  }, []);
+
+  // 2. when the countdown hits 0, move on
+  useEffect(() => {
+    if (left <= 0) onDone();
+  }, [left, onDone]);
+
   return (
     <div className="card">
       <h1>Waiting room</h1>
       <p>{run.d.label} · {run.qty} tickets</p>
       <p>Your presale code: <b>{run.code}</b> (memorize it!)</p>
       <p>Card CVV: <b>{run.cvv}</b></p>
-      <button className="primary big" onClick={onDone}>Results</button>
+      <div className="countdown">{left}</div>
+      <button onClick={onQuit}>Quit</button>
     </div>
   );
 }
@@ -98,8 +112,21 @@ export default function App() {
 
   return (
     <div id="app">
-      {screen === 'setup' && <Setup settings={settings} setSettings={setSettings} onStart={startRun} />}
-      {screen === 'lobby' && <Lobby run={run} onDone={() => setScreen('results')} />}
+      {screen === 'setup' && (
+        <Setup settings={settings} setSettings={setSettings} onStart={startRun} />
+      )}
+
+      {screen === 'lobby' && (
+        <Lobby
+          run={run}
+          onDone={() => {
+            setRun(r => ({ ...r, t0: performance.now() }));         // add t0, keep everything else
+            setScreen('results');                                   // becomes 'queue' in Step 4
+          }}
+          onQuit={() => setScreen('setup')}
+        />
+      )}
+
       {screen === 'results' && <Results onAgain={() => setScreen('setup')} />}
     </div>
   );
